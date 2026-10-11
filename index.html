@@ -7,7 +7,7 @@
 <label>Revision of (optional)</label><select id="parent"><option value="">New document</option></select><label>Document title</label><input id="title" maxlength="160" required><label>Category</label><select id="category"><option>School policies</option><option>Academic handbook</option><option>Student handbook</option><option>Timetables</option><option>Working hours</option><option>Leadership</option></select>
 <label>File name (PDF)</label><input id="filename" maxlength="120" placeholder="policy-revision.pdf"><label>Revision notes</label><textarea id="notes" rows="3"></textarea>
 <button id="register">Save draft record</button><a class="link secondary" target="_blank" rel="noopener noreferrer" href="https://github.com/tektanna-cmd/AAA-Digital-Handbook/upload/main">Upload PDF in GitHub</a><p id="msg" role="status"></p>
-</div><div class="card"><h2>Documents & review queue</h2><button class="secondary" id="refresh">Refresh records</button><div id="items"></div></div><div class="card"><h3>Before public release</h3><p>Verify the PDF, obtain academy approval, then move an approved copy to the designated public publishing repository. The public catalog generator in this project creates the release manifest. This portal intentionally does not offer one-click public publication without a trusted server.</p></div></section>
+</div><div class="card"><h2>Documents & review queue</h2><p class="muted">Published PDF files are public once uploaded to <code>approved/</code>. After publisher review, update the public catalog using the export below.</p><button id="exportCatalog" class="secondary" type="button">Download published catalog.json</button><a class="link secondary" href="https://github.com/tektanna-cmd/AAA-Handbook-Admin/upload/main/approved" target="_blank" rel="noopener noreferrer">Upload approved PDFs</a><a class="link secondary" href="https://github.com/tektanna-cmd/AAA-Handbook-Admin/edit/main/catalog.json" target="_blank" rel="noopener noreferrer">Update public catalog</a><button class="secondary" id="refresh">Refresh records</button><div id="items"></div></div><div class="card"><h3>Before public release</h3><p>Verify the PDF, obtain academy approval, then move an approved copy to the designated public publishing repository. The public catalog generator in this project creates the release manifest. This portal intentionally does not offer one-click public publication without a trusted server.</p></div></section>
 </main><script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
@@ -19,6 +19,7 @@ let role=null;const repo="https://github.com/tektanna-cmd/AAA-Digital-Handbook";
 $('signIn').onclick=async()=>{try{await signInWithEmailAndPassword(auth,$('email').value.trim(),$('password').value)}catch(e){$('loginStatus').textContent=e.message}};
 $('signOut').onclick=()=>signOut(auth);
 $('refresh').onclick=()=>refresh().catch(e=>$('msg').textContent=e.message);
+$('exportCatalog').onclick=()=>exportCatalog().catch(e=>$('msg').textContent=e.message);
 $('resetSession').onclick=async()=>{await signOut(auth);$('loginStatus').textContent='Signed out. Please sign in again.';};
 onAuthStateChanged(auth,async user=>{
  $('dashboard').hidden=true;$('login').hidden=false;role=null;
@@ -61,6 +62,26 @@ $('register').onclick=async()=>{
  }catch(e){$('msg').textContent="Could not create draft: "+e.message}
  finally{$('register').disabled=false;}
 };
+async function exportCatalog(){
+ const snaps=await getDocs(collection(db,"documents"));
+ const approved=snaps.docs.map(d=>d.data()).filter(d=>d.status==="published" && typeof d.publicUrl==="string");
+ const manifest={schemaVersion:1,documents:[]};
+ for(const d of approved){
+  const prefix="https://tektanna-cmd.github.io/AAA-Handbook-Admin/";
+  if(!d.publicUrl.startsWith(prefix+"approved/"))continue;
+  const relative=d.publicUrl.slice(prefix.length);
+  const response=await fetch(d.publicUrl,{cache:"no-store"});
+  if(!response.ok)throw Error("Cannot download approved PDF "+relative);
+  const buffer=await response.arrayBuffer();
+  const digest=await crypto.subtle.digest("SHA-256",buffer);
+  const sha256=Array.from(new Uint8Array(digest)).map(v=>v.toString(16).padStart(2,"0")).join("");
+  manifest.documents.push({id:relative.slice(9,-4),title:d.title,url:relative,sha256,size:buffer.byteLength,status:"published"});
+ }
+ const blob=new Blob([JSON.stringify(manifest,null,2)+"\\n"],{type:"application/json"});
+ const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download="catalog.json";link.click();
+ setTimeout(()=>URL.revokeObjectURL(link.href),5000);
+ $('msg').textContent="Downloaded catalog.json. Commit this file to the ROOT of AAA-Handbook-Admin to update Android readers. This is not automatic.";
+}
 async function refresh(){
  const response=await getDocs(collection(db,"documents"));
  const docs=response.docs.sort((a,b)=>(b.data().createdAt?.seconds||0)-(a.data().createdAt?.seconds||0));
@@ -104,10 +125,10 @@ async function refresh(){
   }
   if(d.status==="approved"&&role==="publisher"){
    action("Release approved PDF",async()=>{
-     const url=prompt("Paste the public GitHub Pages URL of the approved PDF. The PDF must already be uploaded to the approved/ folder of AAA-Published-Handbook:");
+     const url=prompt("Paste the public GitHub Pages URL of the approved PDF. The PDF must already be uploaded to the approved/ folder of AAA-Handbook-Admin:");
      if(!url)return;
-     const accepted=/^https:\/\/tektanna-cmd\.github\.io\/AAA-Published-Handbook\/approved\/[A-Za-z0-9._-]+\.pdf$/.test(url);
-     if(!accepted)throw Error("Expected an approved PDF URL under AAA-Published-Handbook/approved/");
+     const accepted=/^https:\/\/tektanna-cmd\.github\.io\/AAA-Handbook-Admin\/approved\/[A-Za-z0-9._-]+\.pdf$/.test(url);
+     if(!accepted)throw Error("Expected an approved PDF URL under AAA-Handbook-Admin/approved/");
      const response=await fetch(url,{method:"GET",cache:"no-store"});
      if(!response.ok)throw Error("Public PDF was not found ("+response.status+").");
      const bytes=new Uint8Array(await response.arrayBuffer());
