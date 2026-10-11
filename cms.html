@@ -1,0 +1,107 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AAA School Content Manager</title><style>
+:root{font:16px system-ui,Arial;color:#193023;background:#f5f8f4}*{box-sizing:border-box}body{margin:0}header{background:#195e35;color:#fff;padding:18px}header small{color:#e8d28f}main{max-width:1030px;margin:auto;padding:14px}.card{background:#fff;border:1px solid #d9e6dd;border-radius:16px;padding:18px;margin:12px 0}h1{font-size:1.55rem;margin:6px 0}h2{font-size:1.3rem;color:#175c35}label{display:block;font-weight:650;margin-top:12px;margin-bottom:5px}input,select,textarea{width:100%;font:inherit;padding:12px;border:1px solid #aebeb3;border-radius:10px}textarea{min-height:130px}button,a.btn{border:0;border-radius:10px;background:#195e35;color:#fff;font:inherit;padding:11px 14px;cursor:pointer;display:inline-block;margin:6px 6px 6px 0;text-decoration:none}button.secondary{color:#195e35;background:#e8f1e9}button.warning{background:#955d10}button:disabled{opacity:.45}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}.row{padding:12px 0;border-bottom:1px solid #e3ece6}.row small{display:block;color:#62746a}.badge{font-size:.78rem;background:#e8f1e9;padding:4px 9px;border-radius:16px}.nav{display:flex;gap:6px;flex-wrap:wrap}.hidden,[hidden]{display:none!important}.notice{white-space:pre-wrap;color:#87531c}.preview{background:#f4f8f3;border-left:4px solid #e0b53b;padding:15px;border-radius:8px;white-space:pre-wrap}.help{font-size:.85rem;color:#617469}.danger{color:#9d2828}.line{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.line>*{flex:1}ul{padding-left:22px}</style></head><body>
+<header><small>AORE ADVENTIST ACADEMY</small><h1>School Content Manager</h1><div>Manage the Android handbook • drafts, review and approved updates</div></header><main>
+<section id="signin" class="card"><h2>Administrator sign in</h2><label>Email</label><input id="email" type="email" autocomplete="username"><label>Password</label><input id="password" type="password" autocomplete="current-password"><button id="loginBtn">Sign in</button><p class="notice" id="loginMsg"></p></section>
+<section id="app" hidden>
+<div class="card"><div class="line"><div><strong id="identity"></strong><br><small id="roleDisplay"></small></div><div><button class="secondary" id="logout">Sign out</button></div></div></div>
+<nav class="nav"><button class="secondary" data-view="home">Dashboard</button><button class="secondary" data-view="editor">Add content</button><button class="secondary" data-view="records">All content</button><button class="secondary" data-view="review">Review queue</button><button class="secondary" data-view="help">How it works</button></nav>
+<section id="home" class="card pane"><h2>School CMS dashboard</h2><p>Update school philosophy, vision, mission, handbook sections and class timetables. Readers see only the latest approved and published material.</p><div id="counts" class="grid"></div><div class="grid"><button data-new="profile">＋ School profile</button><button data-new="policy">＋ Policy section</button><button data-new="timetable">＋ Timetable entry</button><button data-new="notice">＋ School notice</button></div><p class="help">School leaders should confirm the official philosophy, mission and vision wording. Alternative versions in the source Word document are not automatically adopted.</p></section>
+<section id="editor" class="card pane" hidden><h2 id="editHeading">Create school content</h2><div class="grid"><div><label>Content type</label><select id="kind"><option value="profile">School profile</option><option value="policy">Policy / handbook section</option><option value="timetable">Class timetable entry</option><option value="notice">School notice</option></select></div><div><label>Category</label><select id="category"><option>School profile</option><option>Academic Handbook</option><option>Students Handbook</option><option>School policies</option><option>Staff policies</option><option>Timetable</option><option>Announcements</option></select></div></div>
+<label>Section / document title</label><input id="title" maxlength="160" placeholder="Our Mission, Chapter 2, or French - Year 7"><label>Chapter or group (optional)</label><input id="group" maxlength="120" placeholder="School Identity / Student Conduct"><div class="grid"><div><label>Order number</label><input id="position" type="number" min="0" value="0"></div><div><label>Icon</label><select id="symbol"><option value="book">Book</option><option value="target">Mission</option><option value="eye">Vision</option><option value="school">School</option><option value="clock">Timetable</option><option value="shield">Policy</option><option value="info">Information</option></select></div></div>
+<label>Content text</label><textarea id="body" maxlength="30000" placeholder="Paste or edit official school policy text. Use separate lines for each bullet."></textarea>
+<p class="help">Text, headings and line breaks are displayed using the V6.1 academy theme. Keep policy text exactly as authorized by the school.</p>
+<div id="timetableFields" hidden><div class="grid"><div><label>Class</label><input id="schoolClass" placeholder="7, 9A, 11AC1"></div><div><label>Day</label><select id="day"><option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option></select></div><div><label>Period</label><input id="period" placeholder="6"></div><div><label>Subject / Activity</label><input id="subject" placeholder="French"></div><div><label>Teacher</label><input id="teacher" placeholder="OB"></div><div><label>Start time</label><input id="startTime" type="time"></div><div><label>End time</label><input id="endTime" type="time"></div></div></div>
+<label>Approved photo or image URL (optional)</label><input id="imageUrl" type="url" placeholder="https://... (public HTTPS image only)"><p class="help">Private photo/PDF storage is not enabled. Upload only school-approved public images through a controlled GitHub upload; paste the public image URL here. Never upload identifiable students without permission.</p>
+<label>Revision notes</label><textarea id="notes" maxlength="2000" placeholder="What changed and why?" style="min-height:80px"></textarea>
+<h3>Android-style preview</h3><div class="preview"><strong id="previewHeading"></strong><p id="previewBody"></p></div>
+<button id="saveDraft">Save draft</button><button class="secondary" id="cancelEdit">Cancel</button><p id="editMsg" class="notice" role="status"></p>
+</section>
+<section id="records" class="card pane" hidden><h2>Documents and sections</h2><input id="search" placeholder="Find title, chapter, category or status"><button class="secondary" id="reload">Refresh</button><div id="rows"></div></section>
+<section id="review" class="card pane" hidden><h2>Pending review</h2><p>Editors submit changes. Only a publisher may approve and release the latest version. Rejected drafts can be revised and resubmitted.</p><div id="queue"></div></section>
+<section id="help" class="card pane" hidden><h2>How to update the Android app</h2><ol><li>Open a school profile, policy section, timetable entry or notice.</li><li>Choose Edit, update text or timetable fields, and Save draft.</li><li>Submit for review; the Principal/authorized Publisher checks the changes.</li><li>Publisher presses Approve & publish. The public Firestore copy is replaced.</li><li>The Android app checks for new approved content when opened or when readers refresh; a local offline copy is retained.</li></ol><p><strong>Deleting:</strong> Use Archive to remove content from future synchronization. The public copy is removed after approval of the archive. An existing offline copy may remain on phones until their next sync.</p><p><strong>Photos:</strong> Current no-billing mode uses a verified public HTTPS image URL; do not upload private drafts directly to public GitHub Pages.</p></section>
+</section></main>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+import {getFirestore,collection,doc,getDoc,getDocs,setDoc,deleteDoc,serverTimestamp,writeBatch} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import {firebaseConfig} from "./firebase-config.js";
+const $=id=>document.getElementById(id);
+const fb=initializeApp(firebaseConfig),auth=getAuth(fb),db=getFirestore(fb);
+let role=null,rows=[],editing=null;
+const fields=["kind","category","title","group","position","symbol","body","schoolClass","day","period","subject","teacher","startTime","endTime","imageUrl","notes"];
+function view(id){document.querySelectorAll(".pane").forEach(p=>p.hidden=p.id!==id);if(id==="review"||id==="records"||id==="home")load().catch(e=>alert(e.message))}
+document.querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>view(b.dataset.view));
+document.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>newDoc(b.dataset.new));
+$("loginBtn").onclick=async()=>{try{await signInWithEmailAndPassword(auth,$("email").value.trim(),$("password").value)}catch(e){$("loginMsg").textContent=e.message}};
+$("logout").onclick=()=>signOut(auth);$("cancelEdit").onclick=()=>view("records");$("kind").onchange=()=>{$("timetableFields").hidden=$("kind").value!=="timetable";preview()};
+$("title").oninput=preview;$("body").oninput=preview;
+$("search").oninput=render;$("reload").onclick=()=>load().catch(e=>alert(e.message));
+function preview(){$("previewHeading").textContent=$("title").value;$("previewBody").textContent=$("body").value}
+function newDoc(kind="policy"){editing=null;for(const key of fields){const el=$(key);if(el)el.value=key==="position"?"0":""}
+ $("kind").value=kind;$("category").value=kind==="profile"?"School profile":kind==="timetable"?"Timetable":kind==="notice"?"Announcements":"School policies";
+ $("symbol").value=kind==="profile"?"school":kind==="timetable"?"clock":"book";$("day").value="Monday";$("editHeading").textContent="Add "+kind;$("editMsg").textContent="";$("timetableFields").hidden=kind!=="timetable";preview();view("editor")}
+function editDoc(d){editing=d.id;for(const key of fields){if($(key))$(key).value=d[key]??""}
+ $("day").value=d.day||"Monday";$("kind").value=d.kind;$("timetableFields").hidden=d.kind!=="timetable";$("editHeading").textContent="Edit: "+d.title;$("editMsg").textContent="";preview();view("editor")}
+const allowImage=s=>!s||(/^https:\/\/[^\s]+\.(?:jpg|jpeg|png|webp)(?:\?[^\s]*)?$/i.test(s));
+function formData(){const d={};for(const key of fields)d[key]=$(key)?.value??"";d.title=d.title.trim();d.body=d.body.trim();d.position=parseInt(d.position,10)||0;return d}
+$("saveDraft").onclick=async()=>{
+ const b=$("saveDraft"),d=formData();
+ if(!d.title||d.title.length>160){$("editMsg").textContent="Please enter a title.";return}
+ if(!allowImage(d.imageUrl)){$("editMsg").textContent="Image must be a public HTTPS JPG, PNG or WebP link.";return}
+ if(d.kind==="timetable"&&(!d.schoolClass||!d.subject||!d.startTime||!d.endTime||d.startTime>=d.endTime)){$("editMsg").textContent="Complete class, subject and valid start/end times.";return}
+ b.disabled=true;
+ try{
+  const old=editing?rows.find(x=>x.id===editing):null;
+  const id=editing||crypto.randomUUID();
+  const batch=writeBatch(db);
+  const item={...d,status:"draft",version:(old?.version||0)+1,createdBy:old?.createdBy||auth.currentUser.uid,
+    updatedBy:auth.currentUser.uid,updatedAt:serverTimestamp(),createdAt:old?.createdAt||serverTimestamp()};
+  batch.set(doc(db,"cms",id),item);
+  batch.set(doc(collection(db,"cmsRevisions")),{
+    cmsId:id,version:item.version,action:old?"edit":"create",actor:auth.currentUser.uid,
+    previous:old?Object.fromEntries(fields.map(k=>[k,old[k]??""])):{},next:d,
+    at:serverTimestamp(),notes:d.notes||""});
+  await batch.commit();$("editMsg").textContent="Draft saved. Submit it for approval from All content.";editing=id;await load();
+ }catch(e){$("editMsg").textContent=e.message}finally{b.disabled=false}
+};
+async function load(){
+ const snaps=await getDocs(collection(db,"cms"));rows=snaps.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>(a.position||0)-(b.position||0));
+ const counts={Published:rows.filter(x=>x.status==="published").length,Drafts:rows.filter(x=>x.status==="draft").length,Review:rows.filter(x=>x.status==="review").length,Archived:rows.filter(x=>x.status==="archived").length};
+ $("counts").replaceChildren();for(const [label,n]of Object.entries(counts)){const box=document.createElement("div");box.className="card";box.textContent=label+": "+n;$("counts").append(box)}
+ render();
+}
+function btn(text,action,variant="secondary"){const b=document.createElement("button");b.textContent=text;b.className=variant;b.onclick=async()=>{b.disabled=true;try{await action();await load()}catch(e){alert(e.message)}finally{b.disabled=false}};return b}
+function card(d){const wrap=document.createElement("article");wrap.className="row";
+ const name=document.createElement("strong");name.textContent=d.title+" · v"+(d.version||1);const meta=document.createElement("small");meta.textContent=d.kind+" / "+d.category+" / "+d.status+" / "+(d.group||"Ungrouped");wrap.append(name,meta);
+ const summary=document.createElement("p");summary.textContent=(d.body||d.subject||"").slice(0,180);wrap.append(summary);
+ const actions=document.createElement("div");wrap.append(actions);
+ if(d.status!=="archived")actions.append(btn("Edit",()=>editDoc(d)));
+ if(d.status==="draft"||d.status==="rejected")actions.append(btn("Submit for review",()=>transition(d,"review")));
+ if(role==="publisher"&&d.status==="review"){actions.append(btn("Approve & publish",()=>publish(d),""));actions.append(btn("Reject",async()=>{const reason=prompt("Reason for rejection:");if(reason?.trim())await transition(d,"rejected",reason)},"warning"))}
+ if(d.status==="published")actions.append(btn("Request archive",()=>transition(d,"review_archive"),"warning"));
+ if(role==="publisher"&&d.status==="review_archive")actions.append(btn("Approve archive",()=>publish(d,true),"warning"));
+ return wrap}
+function render(){const term=$("search").value.toLowerCase();$("rows").replaceChildren();$("queue").replaceChildren();for(const d of rows){
+ if([d.title,d.category,d.group,d.status,d.kind].join(" ").toLowerCase().includes(term))$("rows").append(card(d));
+ if(["review","review_archive"].includes(d.status))$("queue").append(card(d))
+}}
+async function transition(d,status,reason=""){const b=writeBatch(db);b.update(doc(db,"cms",d.id),{status,reviewNote:reason,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});
+ b.set(doc(collection(db,"cmsRevisions")),{cmsId:d.id,version:d.version,action:status,actor:auth.currentUser.uid,at:serverTimestamp(),notes:reason});await b.commit()}
+async function publish(d,archive=false){
+ if(role!=="publisher")throw Error("Publisher role required");
+ if(!confirm(archive?"Archive this item for Android readers?":"Publish the approved content to Android readers?"))return;
+ const b=writeBatch(db),next=archive?"archived":"published";
+ b.update(doc(db,"cms",d.id),{status:next,approvedBy:auth.currentUser.uid,approvedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+ if(archive)b.delete(doc(db,"publicContent",d.id));
+ else b.set(doc(db,"publicContent",d.id),{...Object.fromEntries(fields.map(k=>[k,d[k]??""])),position:Number(d.position)||0,version:Number(d.version)||1,status:"published",publishedAt:serverTimestamp()});
+ b.set(doc(collection(db,"cmsRevisions")),{cmsId:d.id,version:d.version,action:next,actor:auth.currentUser.uid,at:serverTimestamp(),notes:"Principal/publisher approval"});
+ await b.commit();
+}
+onAuthStateChanged(auth,async user=>{
+ $("app").hidden=true;$("signin").hidden=false;role=null;if(!user)return;
+ try{const snapshot=await getDoc(doc(db,"admins",user.uid));role=snapshot.data()?.role;
+ if(!["editor","publisher"].includes(role)){await signOut(auth);$("loginMsg").textContent="Administrator role missing or unauthorized.";return}
+ $("identity").textContent=user.email;$("roleDisplay").textContent="Access: "+role;$("signin").hidden=true;$("app").hidden=false;await load()
+ }catch(e){$("loginMsg").textContent=e.message}
+});
+</script></body></html>
