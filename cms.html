@@ -95,6 +95,7 @@ function card(d){const wrap=document.createElement("article");wrap.className="ro
  const summary=document.createElement("p");summary.textContent=(d.body||d.subject||"").slice(0,180);wrap.append(summary);
  const actions=document.createElement("div");wrap.append(actions);
  if(d.status!=="archived")actions.append(btn("Edit",()=>editDoc(d)));
+ actions.append(btn("History / restore",()=>history(d)));
  if(d.status==="draft"||d.status==="rejected")actions.append(btn("Submit for review",()=>transition(d,"review")));
  if(role==="publisher"&&d.status==="review"){actions.append(btn("Approve & publish",()=>publish(d),""));actions.append(btn("Reject",async()=>{const reason=prompt("Reason for rejection:");if(reason?.trim())await transition(d,"rejected",reason)},"warning"))}
  if(d.status==="published")actions.append(btn("Request archive",()=>transition(d,"review_archive"),"warning"));
@@ -104,6 +105,19 @@ function render(){const term=$("search").value.toLowerCase();$("rows").replaceCh
  if([d.title,d.category,d.group,d.status,d.kind].join(" ").toLowerCase().includes(term))$("rows").append(card(d));
  if(["review","review_archive"].includes(d.status))$("queue").append(card(d))
 }}
+async function history(d){
+ const revisions=await getDocs(collection(db,"cmsRevisions"));
+ const matches=revisions.docs.map(x=>x.data()).filter(x=>x.cmsId===d.id).sort((a,b)=>(b.version||0)-(a.version||0));
+ const summary=matches.slice(0,12).map((x,i)=>i+": "+x.action+" (version "+x.version+") • "+(x.notes||"")).join("\\n");
+ const choice=prompt("Revision history for "+d.title+"\\n"+summary+"\\n\\nEnter a number to restore its previous content as a NEW draft. Cancel to close.");
+ if(choice===null)return;
+ const chosen=matches[Number(choice)];if(!chosen||!chosen.previous||!Object.keys(chosen.previous).length){alert("No editable previous snapshot for this event.");return}
+ editing=d.id;for(const k of fields)if($(k))$(k).value=chosen.previous[k]??"";
+ $("kind").value=chosen.previous.kind||d.kind;$("day").value=chosen.previous.day||"Monday";
+ $("timetableFields").hidden=$("kind").value!=="timetable";
+ $("notes").value="Restored from revision history. Review before publishing.";
+ $("editHeading").textContent="Restore previous version: "+d.title;preview();view("editor");
+}
 async function transition(d,status,reason=""){const b=writeBatch(db);b.update(doc(db,"cms",d.id),{status,reviewNote:reason,updatedAt:serverTimestamp(),updatedBy:auth.currentUser.uid});
  b.set(doc(collection(db,"cmsRevisions")),{cmsId:d.id,version:d.version,action:status,actor:auth.currentUser.uid,at:serverTimestamp(),notes:reason});await b.commit()}
 async function publish(d,archive=false){
