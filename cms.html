@@ -5,7 +5,7 @@
 <section id="app" hidden>
 <div class="card"><div class="line"><div><strong id="identity"></strong><br><small id="roleDisplay"></small></div><div><button class="secondary" id="logout">Sign out</button></div></div></div>
 <nav class="nav"><button class="secondary" data-view="home">Dashboard</button><button class="secondary" data-view="editor">Add content</button><button class="secondary" data-view="records">All content</button><button class="secondary" data-view="review">Review queue</button><button class="secondary" data-view="help">How it works</button></nav>
-<section id="home" class="card pane"><h2>School CMS dashboard</h2><p>Update school philosophy, vision, mission, handbook sections and class timetables. Readers see only the latest approved and published material.</p><div id="counts" class="grid"></div><div class="grid"><button data-new="profile">＋ School profile</button><button data-new="policy">＋ Policy section</button><button data-new="timetable">＋ Timetable entry</button><button data-new="notice">＋ School notice</button></div><p class="help">School leaders should confirm the official philosophy, mission and vision wording. Alternative versions in the source Word document are not automatically adopted.</p></section>
+<section id="home" class="card pane"><h2>School CMS dashboard</h2><p>Update school philosophy, vision, mission, handbook sections and class timetables. Readers see only the latest approved and published material.</p><div id="counts" class="grid"></div><div class="grid"><button data-new="profile">＋ School profile</button><button data-new="policy">＋ Policy section</button><button data-new="timetable">＋ Timetable entry</button><button data-new="notice">＋ School notice</button><button class="secondary" id="seedPhilosophy">Prepare Philosophy, Mission & Vision drafts</button></div><p class="help">School leaders should confirm the official philosophy, mission and vision wording. Alternative versions in the source Word document are not automatically adopted.</p></section>
 <section id="editor" class="card pane" hidden><h2 id="editHeading">Create school content</h2><div class="grid"><div><label>Content type</label><select id="kind"><option value="profile">School profile</option><option value="policy">Policy / handbook section</option><option value="timetable">Class timetable entry</option><option value="notice">School notice</option></select></div><div><label>Category</label><select id="category"><option>School profile</option><option>Academic Handbook</option><option>Students Handbook</option><option>School policies</option><option>Staff policies</option><option>Timetable</option><option>Announcements</option></select></div></div>
 <label>Section / document title</label><input id="title" maxlength="160" placeholder="Our Mission, Chapter 2, or French - Year 7"><label>Chapter or group (optional)</label><input id="group" maxlength="120" placeholder="School Identity / Student Conduct"><div class="grid"><div><label>Order number</label><input id="position" type="number" min="0" value="0"></div><div><label>Icon</label><select id="symbol"><option value="book">Book</option><option value="target">Mission</option><option value="eye">Vision</option><option value="school">School</option><option value="clock">Timetable</option><option value="shield">Policy</option><option value="info">Information</option></select></div></div>
 <label>Content text</label><textarea id="body" maxlength="30000" placeholder="Paste or edit official school policy text. Use separate lines for each bullet."></textarea>
@@ -35,6 +35,25 @@ document.querySelectorAll("[data-new]").forEach(b=>b.onclick=()=>newDoc(b.datase
 $("loginBtn").onclick=async()=>{try{await signInWithEmailAndPassword(auth,$("email").value.trim(),$("password").value)}catch(e){$("loginMsg").textContent=e.message}};
 $("logout").onclick=()=>signOut(auth);$("cancelEdit").onclick=()=>view("records");$("kind").onchange=()=>{$("timetableFields").hidden=$("kind").value!=="timetable";preview()};
 $("title").oninput=preview;$("body").oninput=preview;
+$("seedPhilosophy").onclick=async()=>{
+ if(!confirm("Create three editable drafts from the Deputy Principal's AAA Philosophy file? These will not be published until approved."))return;
+ const items=[
+ {title:"Our Philosophy",body:"Our school provides a Christ-centered education, aiming to restore students to God's image and develop them fully spiritually, mentally, physically, and socially for a purposeful life now and eternity.",symbol:"school",position:1},
+ {title:"Our Mission",body:"To deliver Christ-centered education that holistically restores students to God's image for a purposeful and eternal life.",symbol:"target",position:2},
+ {title:"Our Vision",body:"Individuals fully restored to God's image, holistically developed for eternal purpose.",symbol:"eye",position:3}
+ ];
+ const existing=rows.filter(x=>x.kind==="profile").map(x=>x.title.toLowerCase());
+ const batch=writeBatch(db);
+ for(const entry of items){
+  if(existing.includes(entry.title.toLowerCase()))continue;
+  const id=crypto.randomUUID();
+  batch.set(doc(db,"cms",id),{kind:"profile",category:"School profile",title:entry.title,group:"AAA School Identity",body:entry.body,symbol:entry.symbol,position:entry.position,
+   schoolClass:"",day:"Monday",period:"",subject:"",teacher:"",startTime:"",endTime:"",imageUrl:"",
+   notes:"From AAA Philosophy.docx — awaiting Principal confirmation of official wording",
+   version:1,status:"draft",createdBy:auth.currentUser.uid,updatedBy:auth.currentUser.uid,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+ }
+ await batch.commit();await load();view("records");
+};
 $("search").oninput=render;$("reload").onclick=()=>load().catch(e=>alert(e.message));
 function preview(){$("previewHeading").textContent=$("title").value;$("previewBody").textContent=$("body").value}
 function newDoc(kind="policy"){editing=null;for(const key of fields){const el=$(key);if(el)el.value=key==="position"?"0":""}
