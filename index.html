@@ -3,21 +3,22 @@
 <body><header><strong>AAA Digital Handbook</strong><div>Aore Adventist Academy · Administrator console</div></header><main>
 <div class="card"><strong>No-billing publishing mode</strong><p class="muted">Firebase login and Firestore drafts. PDF storage is managed through GitHub's website; this page never receives a GitHub token. Publishing to readers remains a separate, administrator-reviewed step.</p></div>
 <section id="login" class="card"><h2>Administrator sign in</h2><label>Email</label><input id="email" type="email" autocomplete="username"><label>Password</label><input id="password" type="password" autocomplete="current-password"><button id="signIn">Sign in</button><button id="resetSession" class="secondary" type="button">Sign out / retry</button><p id="loginStatus" role="status"></p></section>
-<section id="dashboard" hidden><div class="card"><button id="signOut" class="secondary">Sign out</button><h2>Register document draft</h2><p class="warn">Create a draft record first, then upload its PDF to the school's private GitHub repository. No files are public from this step.</p>
-<label>Document title</label><input id="title" maxlength="160" required><label>Category</label><select id="category"><option>School policies</option><option>Academic handbook</option><option>Student handbook</option><option>Timetables</option><option>Working hours</option><option>Leadership</option></select>
+<section id="dashboard" hidden><div class="card"><button id="signOut" class="secondary">Sign out</button><h2>Document management</h2><p class="muted">Create new documents and revisions, review pending changes, then publish an approved PDF after placing it in the public approved-files repository.</p><p class="warn">Create a draft record first, then upload its PDF to the school's private GitHub repository. No files are public from this step.</p>
+<label>Revision of (optional)</label><select id="parent"><option value="">New document</option></select><label>Document title</label><input id="title" maxlength="160" required><label>Category</label><select id="category"><option>School policies</option><option>Academic handbook</option><option>Student handbook</option><option>Timetables</option><option>Working hours</option><option>Leadership</option></select>
 <label>File name (PDF)</label><input id="filename" maxlength="120" placeholder="policy-revision.pdf"><label>Revision notes</label><textarea id="notes" rows="3"></textarea>
 <button id="register">Save draft record</button><a class="link secondary" target="_blank" rel="noopener noreferrer" href="https://github.com/tektanna-cmd/AAA-Digital-Handbook/upload/main">Upload PDF in GitHub</a><p id="msg" role="status"></p>
-</div><div class="card"><h2>Draft register</h2><div id="items"></div></div><div class="card"><h3>Before public release</h3><p>Verify the PDF, obtain academy approval, then move an approved copy to the designated public publishing repository. The public catalog generator in this project creates the release manifest. This portal intentionally does not offer one-click public publication without a trusted server.</p></div></section>
+</div><div class="card"><h2>Documents & review queue</h2><button class="secondary" id="refresh">Refresh records</button><div id="items"></div></div><div class="card"><h3>Before public release</h3><p>Verify the PDF, obtain academy approval, then move an approved copy to the designated public publishing repository. The public catalog generator in this project creates the release manifest. This portal intentionally does not offer one-click public publication without a trusted server.</p></div></section>
 </main><script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
 import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import {getFirestore,collection,addDoc,doc,getDoc,getDocs,serverTimestamp} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import {getFirestore,collection,addDoc,doc,getDoc,getDocs,updateDoc,serverTimestamp} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
 import {firebaseConfig} from "./firebase-config.js";
 const $=id=>document.getElementById(id);
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 let role=null;const repo="https://github.com/tektanna-cmd/AAA-Digital-Handbook";
 $('signIn').onclick=async()=>{try{await signInWithEmailAndPassword(auth,$('email').value.trim(),$('password').value)}catch(e){$('loginStatus').textContent=e.message}};
 $('signOut').onclick=()=>signOut(auth);
+$('refresh').onclick=()=>refresh().catch(e=>$('msg').textContent=e.message);
 $('resetSession').onclick=async()=>{await signOut(auth);$('loginStatus').textContent='Signed out. Please sign in again.';};
 onAuthStateChanged(auth,async user=>{
  $('dashboard').hidden=true;$('login').hidden=false;role=null;
@@ -49,21 +50,88 @@ $('register').onclick=async()=>{
  $('register').disabled=true;
  try{
   const path="incoming/"+auth.currentUser.uid+"/"+file;
+  const parentId=$("parent").value;
+  const records=await getDocs(collection(db,"documents"));
+  const prior=parentId?records.docs.find(d=>d.id===parentId):null;
+  const version=prior?(Number(prior.data().version)||1)+1:1;
   await addDoc(collection(db,"documents"),{title,category:$('category').value,notes:$('notes').value,
-   githubPath:path,originalFileName:file,version:1,status:"draft",createdBy:auth.currentUser.uid,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+   githubPath:path,originalFileName:file,version,status:"draft",createdBy:auth.currentUser.uid,...(prior?{parentId}: {}),createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
   $('msg').textContent="Draft registered. Now upload "+path+" through GitHub's authenticated website. A draft record alone does not upload a PDF.";
   await refresh();
  }catch(e){$('msg').textContent="Could not create draft: "+e.message}
  finally{$('register').disabled=false;}
 };
 async function refresh(){
- const docs=await getDocs(collection(db,"documents"));$('items').replaceChildren();
- docs.docs.sort((a,b)=>(b.data().createdAt?.seconds||0)-(a.data().createdAt?.seconds||0)).forEach(s=>{
-  const o=s.data(),item=document.createElement("div");item.className="row";
-  const title=document.createElement("strong");title.textContent=o.title;
-  const info=document.createElement("small");info.textContent=(o.status||"draft")+" • "+(o.githubPath||o.originalFileName||"");
-  item.append(title,info);
-  const hint=document.createElement("small");hint.textContent=o.status==="draft"?"Requires file upload, review and approval":"Review publication record";item.append(hint);$('items').append(item);
- });
+ const response=await getDocs(collection(db,"documents"));
+ const docs=response.docs.sort((a,b)=>(b.data().createdAt?.seconds||0)-(a.data().createdAt?.seconds||0));
+ $('items').replaceChildren();
+ const parent=$('parent'),selection=parent.value;
+ parent.replaceChildren(new Option("New document",""));
+ docs.forEach(d=>parent.add(new Option(d.data().title+" (v"+(d.data().version||1)+")",d.id)));
+ parent.value=selection;
+ if(!docs.length){$('items').textContent="No documents registered yet.";return;}
+ for(const snap of docs){
+  const d=snap.data(),item=document.createElement("article");item.className="row";
+  const title=document.createElement("strong");
+  title.textContent=d.title+" · v"+(d.version||1);
+  const metadata=document.createElement("small");
+  metadata.textContent="Status: "+d.status+" · "+d.category+" · "+d.originalFileName;
+  const notes=document.createElement("small");notes.textContent=d.notes||"No revision notes";
+  const actions=document.createElement("div");actions.className="actions";
+  item.append(title,metadata,notes,actions);
+  const pathLabel=document.createElement("small");pathLabel.textContent="Draft path: "+(d.githubPath||"not recorded");item.append(pathLabel);
+  function action(label,fn){
+    const button=document.createElement("button");button.type="button";button.textContent=label;button.className="secondary";
+    button.onclick=async()=>{button.disabled=true;try{await fn();await refresh()}catch(e){$('msg').textContent=e.code||e.message}finally{button.disabled=false}};
+    actions.append(button);
+  }
+  if(d.status==="draft"&&role==="publisher"){
+   action("Approve",async()=>{
+     if(!confirm("Have you checked the uploaded PDF and obtained school approval?"))return;
+     await updateDoc(doc(db,"documents",snap.id),{
+       status:"approved",reviewedBy:auth.currentUser.uid,reviewedAt:serverTimestamp(),
+       reviewNote:"Approved for manual release",approvedBy:auth.currentUser.uid,approvedAt:serverTimestamp(),updatedAt:serverTimestamp()
+     });
+   });
+   action("Reject",async()=>{
+     const reason=prompt("Reason for rejecting this draft:");
+     if(!reason?.trim())return;
+     await updateDoc(doc(db,"documents",snap.id),{
+       status:"rejected",reviewedBy:auth.currentUser.uid,reviewedAt:serverTimestamp(),
+       reviewNote:reason.trim().slice(0,2000),updatedAt:serverTimestamp()
+     });
+   });
+  }
+  if(d.status==="approved"&&role==="publisher"){
+   action("Release approved PDF",async()=>{
+     const url=prompt("Paste the public GitHub Pages URL of the approved PDF. The PDF must already be uploaded to the approved/ folder of AAA-Published-Handbook:");
+     if(!url)return;
+     const accepted=/^https:\/\/tektanna-cmd\.github\.io\/AAA-Published-Handbook\/approved\/[A-Za-z0-9._-]+\.pdf$/.test(url);
+     if(!accepted)throw Error("Expected an approved PDF URL under AAA-Published-Handbook/approved/");
+     const response=await fetch(url,{method:"GET",cache:"no-store"});
+     if(!response.ok)throw Error("Public PDF was not found ("+response.status+").");
+     const bytes=new Uint8Array(await response.arrayBuffer());
+     if(bytes.length<5 || String.fromCharCode(...bytes.slice(0,5))!=="%PDF-")throw Error("The URL did not return a valid PDF.");
+     if(!confirm("PDF reachable ("+bytes.length+" bytes). Release this approved revision to the public catalog?"))return;
+     await updateDoc(doc(db,"documents",snap.id),{
+       status:"published",publicUrl:url,publishedBy:auth.currentUser.uid,publishedAt:serverTimestamp(),updatedAt:serverTimestamp()
+     });
+   });
+  }
+  if(d.status==="published"&&role==="publisher"){
+   action("Withdraw listing",async()=>{
+     const reason=prompt("Reason for withdrawal:");
+     if(!reason?.trim())return;
+     await updateDoc(doc(db,"documents",snap.id),{
+       status:"withdrawn",reviewedBy:auth.currentUser.uid,reviewedAt:serverTimestamp(),
+       reviewNote:reason.trim().slice(0,2000),updatedAt:serverTimestamp()
+     });
+   });
+  }
+  if(d.status==="published"&&d.publicUrl){
+   const a=document.createElement("a");a.href=d.publicUrl;a.target="_blank";a.rel="noopener noreferrer";a.textContent="Open published PDF";a.className="link secondary";actions.append(a);
+  }
+  $('items').append(item);
+ }
 }
 </script></body></html>
