@@ -1,0 +1,53 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>AAA Publishing Console</title>
+<style>body{font:16px system-ui,Arial;margin:0;background:#f5f8f5;color:#19261d}header{background:#185f36;color:white;padding:18px}main{max-width:870px;padding:16px;margin:auto}.card{background:white;border:1px solid #dae7dd;border-radius:16px;padding:18px;margin-bottom:16px}label{display:block;font-weight:600;margin:13px 0 6px}input,select,textarea{font:inherit;width:100%;box-sizing:border-box;padding:11px;border:1px solid #a9bcb0;border-radius:9px}button,.link{display:inline-block;border:0;background:#185f36;color:white;border-radius:9px;padding:11px 14px;margin:9px 8px 0 0;text-decoration:none;cursor:pointer;font:inherit}button:disabled{opacity:.5}.secondary{background:#e8f0ea;color:#185f36}.muted{color:#5e6c64}.warn{color:#915218}.row{border-bottom:1px solid #e0e8e2;padding:12px 0}.row small{display:block}.actions{display:flex;flex-wrap:wrap}#msg,#loginStatus{white-space:pre-wrap}</style></head>
+<body><header><strong>AAA Digital Handbook</strong><div>Aore Adventist Academy · Administrator console</div></header><main>
+<div class="card"><strong>No-billing publishing mode</strong><p class="muted">Firebase login and Firestore drafts. PDF storage is managed through GitHub's website; this page never receives a GitHub token. Publishing to readers remains a separate, administrator-reviewed step.</p></div>
+<section id="login" class="card"><h2>Administrator sign in</h2><label>Email</label><input id="email" type="email" autocomplete="username"><label>Password</label><input id="password" type="password" autocomplete="current-password"><button id="signIn">Sign in</button><p id="loginStatus" role="status"></p></section>
+<section id="dashboard" hidden><div class="card"><button id="signOut" class="secondary">Sign out</button><h2>Register document draft</h2><p class="warn">Create a draft record first, then upload its PDF to the school's private GitHub repository. No files are public from this step.</p>
+<label>Document title</label><input id="title" maxlength="160" required><label>Category</label><select id="category"><option>School policies</option><option>Academic handbook</option><option>Student handbook</option><option>Timetables</option><option>Working hours</option><option>Leadership</option></select>
+<label>File name (PDF)</label><input id="filename" maxlength="120" placeholder="policy-revision.pdf"><label>Revision notes</label><textarea id="notes" rows="3"></textarea>
+<button id="register">Save draft record</button><a class="link secondary" target="_blank" rel="noopener noreferrer" href="https://github.com/tektanna-cmd/AAA-Digital-Handbook/upload/main">Upload PDF in GitHub</a><p id="msg" role="status"></p>
+</div><div class="card"><h2>Draft register</h2><div id="items"></div></div><div class="card"><h3>Before public release</h3><p>Verify the PDF, obtain academy approval, then move an approved copy to the designated public publishing repository. The public catalog generator in this project creates the release manifest. This portal intentionally does not offer one-click public publication without a trusted server.</p></div></section>
+</main><script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+import {getFirestore,collection,addDoc,doc,getDoc,getDocs,serverTimestamp} from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
+import {firebaseConfig} from "./firebase-config.js";
+const $=id=>document.getElementById(id);
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+let role=null;const repo="https://github.com/tektanna-cmd/AAA-Digital-Handbook";
+$('signIn').onclick=async()=>{try{await signInWithEmailAndPassword(auth,$('email').value.trim(),$('password').value)}catch(e){$('loginStatus').textContent=e.message}};
+$('signOut').onclick=()=>signOut(auth);
+onAuthStateChanged(auth,async user=>{
+ $('dashboard').hidden=true;$('login').hidden=!!user;role=null;
+ if(!user)return;
+ try{const profile=await getDoc(doc(db,"admins",user.uid));role=profile.exists()?profile.data().role:null;
+  if(!["editor","publisher"].includes(role)){await signOut(auth);$('loginStatus').textContent="Administrator access not authorized";return;}
+  $('dashboard').hidden=false;await refresh();
+ }catch(e){$('loginStatus').textContent=e.message;await signOut(auth);}
+});
+function validFile(name){return /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.pdf$/i.test(name)&&!name.includes("..");}
+$('register').onclick=async()=>{
+ const title=$('title').value.trim(),file=$('filename').value.trim();
+ if(!title||!validFile(file)){$('msg').textContent="Enter a title and simple PDF filename (letters, digits, dash, underscore).";return}
+ $('register').disabled=true;
+ try{
+  const path="incoming/"+auth.currentUser.uid+"/"+file;
+  await addDoc(collection(db,"documents"),{title,category:$('category').value,notes:$('notes').value,
+   githubPath:path,originalFileName:file,version:1,status:"draft",createdBy:auth.currentUser.uid,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+  $('msg').textContent="Draft registered. Now upload "+path+" through GitHub's authenticated website. A draft record alone does not upload a PDF.";
+  await refresh();
+ }catch(e){$('msg').textContent="Could not create draft: "+e.message}
+ finally{$('register').disabled=false;}
+};
+async function refresh(){
+ const docs=await getDocs(collection(db,"documents"));$('items').replaceChildren();
+ docs.docs.sort((a,b)=>(b.data().createdAt?.seconds||0)-(a.data().createdAt?.seconds||0)).forEach(s=>{
+  const o=s.data(),item=document.createElement("div");item.className="row";
+  const title=document.createElement("strong");title.textContent=o.title;
+  const info=document.createElement("small");info.textContent=(o.status||"draft")+" • "+(o.githubPath||o.originalFileName||"");
+  item.append(title,info);
+  const hint=document.createElement("small");hint.textContent=o.status==="draft"?"Requires file upload, review and approval":"Review publication record";item.append(hint);$('items').append(item);
+ });
+}
+</script></body></html>
